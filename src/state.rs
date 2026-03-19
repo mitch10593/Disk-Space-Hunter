@@ -18,6 +18,7 @@ pub enum ScanMessage {
         total: u32,
     },
     DuplicatesComplete(Vec<DuplicateGroup>),
+    #[allow(dead_code)]
     Error(String),
 }
 

@@ -40,13 +40,6 @@ impl DirNode {
         }
     }
 
-    pub fn percentage_of(&self, parent_total: u64) -> f32 {
-        if parent_total == 0 {
-            0.0
-        } else {
-            self.total_size as f32 / parent_total as f32
-        }
-    }
 }
 
 #[derive(Clone)]
