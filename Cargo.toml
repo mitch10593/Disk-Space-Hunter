@@ -1,0 +1,17 @@
+[package]
+name = "poc-tree-size-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.33"
+egui_extras = { version = "0.33", features = ["default"] }
+rfd = "0.15"
+jwalk = "0.8"
+blake3 = { version = "1", features = ["pure"] }
+crossbeam-channel = "0.5"
+anyhow = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(cargo build:*)"
+    ]
+  }
+}
