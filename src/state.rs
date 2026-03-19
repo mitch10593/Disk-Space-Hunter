@@ -1,9 +1,10 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 use crossbeam_channel::Receiver;
 
-use crate::scanner::tree::{DirNode, DuplicateGroup};
+use crate::scanner::tree::{DirNode, DuplicateCandidate, DuplicateGroup};
 
 pub enum ScanMessage {
     Progress {
@@ -16,7 +17,10 @@ pub enum ScanMessage {
         phase: String,
         checked: u32,
         total: u32,
+        bytes_read: u64,
+        bytes_total: u64,
     },
+    DuplicateCandidates(Vec<DuplicateCandidate>),
     DuplicatesComplete(Vec<DuplicateGroup>),
     #[allow(dead_code)]
     Error(String),
@@ -51,6 +55,7 @@ pub struct AppState {
     pub scan_status: ScanStatus,
     pub root_node: Option<DirNode>,
     pub duplicates: Vec<DuplicateGroup>,
+    pub dup_candidates: Vec<DuplicateCandidate>,
     pub active_tab: Tab,
     pub sort_column: SortColumn,
     pub sort_ascending: bool,
@@ -61,6 +66,9 @@ pub struct AppState {
     pub dup_progress_phase: String,
     pub dup_progress_checked: u32,
     pub dup_progress_total: u32,
+    pub dup_bytes_read: u64,
+    pub dup_bytes_total: u64,
+    pub dup_phase_start: Option<Instant>,
     pub detect_duplicates: bool,
     pub min_dup_size: u64,
     pub cancel_flag: Arc<AtomicBool>,
@@ -73,6 +81,7 @@ impl Default for AppState {
             scan_status: ScanStatus::Idle,
             root_node: None,
             duplicates: Vec::new(),
+            dup_candidates: Vec::new(),
             active_tab: Tab::TreeView,
             sort_column: SortColumn::TotalSize,
             sort_ascending: false,
@@ -83,6 +92,9 @@ impl Default for AppState {
             dup_progress_phase: String::new(),
             dup_progress_checked: 0,
             dup_progress_total: 0,
+            dup_bytes_read: 0,
+            dup_bytes_total: 0,
+            dup_phase_start: None,
             detect_duplicates: false,
             min_dup_size: 1024 * 1024, // 1 MB
             cancel_flag: Arc::new(AtomicBool::new(false)),
@@ -129,13 +141,24 @@ impl AppState {
                     phase,
                     checked,
                     total,
+                    bytes_read,
+                    bytes_total,
                 } => {
+                    if self.dup_progress_phase != phase {
+                        self.dup_phase_start = Some(Instant::now());
+                    }
                     self.dup_progress_phase = phase;
                     self.dup_progress_checked = checked;
                     self.dup_progress_total = total;
+                    self.dup_bytes_read = bytes_read;
+                    self.dup_bytes_total = bytes_total;
+                }
+                ScanMessage::DuplicateCandidates(candidates) => {
+                    self.dup_candidates = candidates;
                 }
                 ScanMessage::DuplicatesComplete(groups) => {
                     self.duplicates = groups;
+                    self.dup_candidates.clear();
                     self.scan_status = ScanStatus::Complete;
                     self.scan_rx = None;
                 }

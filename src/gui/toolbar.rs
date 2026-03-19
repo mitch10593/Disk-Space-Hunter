@@ -69,14 +69,41 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 ui.spinner();
                 if state.dup_progress_total > 0 {
-                    ui.label(format!(
-                        "Duplicates: {} ({}/{})",
-                        state.dup_progress_phase,
-                        state.dup_progress_checked,
-                        state.dup_progress_total
-                    ));
                     let progress =
                         state.dup_progress_checked as f32 / state.dup_progress_total as f32;
+
+                    // Speed and ETA based on bytes
+                    let speed_eta = if let Some(start) = state.dup_phase_start {
+                        let elapsed = start.elapsed().as_secs_f64();
+                        if elapsed > 0.5 && state.dup_bytes_read > 0 {
+                            let speed = state.dup_bytes_read as f64 / elapsed;
+                            let speed_str = format!(
+                                "{}/s",
+                                crate::gui::formatting::format_size(speed as u64)
+                            );
+                            let remaining_bytes =
+                                state.dup_bytes_total.saturating_sub(state.dup_bytes_read);
+                            let eta_secs = (remaining_bytes as f64 / speed) as u64;
+                            let eta_str = if eta_secs >= 60 {
+                                format!("{}m {:02}s", eta_secs / 60, eta_secs % 60)
+                            } else {
+                                format!("{}s", eta_secs)
+                            };
+                            format!(" — {} — ETA {}", speed_str, eta_str)
+                        } else {
+                            String::new()
+                        }
+                    } else {
+                        String::new()
+                    };
+
+                    ui.label(format!(
+                        "Duplicates: {} ({}/{}){}",
+                        state.dup_progress_phase,
+                        state.dup_progress_checked,
+                        state.dup_progress_total,
+                        speed_eta
+                    ));
                     ui.add(egui::ProgressBar::new(progress).desired_width(200.0));
                 } else {
                     ui.label(format!("Duplicates: {}", state.dup_progress_phase));
@@ -116,6 +143,7 @@ fn start_scan(state: &mut AppState, ctx: &egui::Context) {
     state.current_scan_path.clear();
     state.root_node = None;
     state.duplicates.clear();
+    state.dup_candidates.clear();
     state.cancel_flag = Arc::new(AtomicBool::new(false));
 
     let repaint_ctx = ctx.clone();

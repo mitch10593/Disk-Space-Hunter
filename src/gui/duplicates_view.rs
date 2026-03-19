@@ -1,9 +1,18 @@
 use eframe::egui;
 
 use crate::gui::formatting::format_size;
-use crate::state::AppState;
+use crate::scanner::tree::DuplicateStatus;
+use crate::state::{AppState, ScanStatus};
 
 pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
+    let is_scanning = state.scan_status == ScanStatus::DetectingDuplicates;
+
+    // Show candidates during scan
+    if is_scanning && !state.dup_candidates.is_empty() {
+        render_candidates(ui, state);
+        return;
+    }
+
     if state.duplicates.is_empty() {
         ui.centered_and_justified(|ui| {
             if state.detect_duplicates {
@@ -66,4 +75,56 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
                 });
             });
         });
+}
+
+fn render_candidates(ui: &mut egui::Ui, state: &AppState) {
+    let confirmed = state.dup_candidates.iter().filter(|c| c.status == DuplicateStatus::Confirmed).count();
+    let pending = state.dup_candidates.len() - confirmed;
+
+    let total_wasted_est: u64 = state.dup_candidates.iter()
+        .map(|c| c.file_size * (c.paths.len() as u64 - 1))
+        .sum();
+
+    ui.heading(format!(
+        "\u{1F50D} Analysing duplicates — \u{2705} {} confirmed, \u{1F50E} {} pending — ~{} wasted",
+        confirmed, pending, format_size(total_wasted_est)
+    ));
+    ui.separator();
+
+    egui::ScrollArea::vertical().show(ui, |ui| {
+        for candidate in &state.dup_candidates {
+            let emoji = match candidate.status {
+                DuplicateStatus::SameSize => "\u{1F50D}",
+                DuplicateStatus::SamePartialHash => "\u{1F50E}",
+                DuplicateStatus::Confirmed => "\u{2705}",
+            };
+            let wasted = candidate.file_size * (candidate.paths.len() as u64 - 1);
+            let header_text = format!(
+                "{} {} — {} files — {} wasted",
+                emoji,
+                format_size(candidate.file_size),
+                candidate.paths.len(),
+                format_size(wasted)
+            );
+
+            egui::CollapsingHeader::new(header_text)
+                .id_salt(candidate.paths.first().map(|p| p.display().to_string()).unwrap_or_default())
+                .show(ui, |ui| {
+                    for path in &candidate.paths {
+                        ui.horizontal(|ui| {
+                            if ui.small_button("\u{1F4C2}").on_hover_text("Show in Explorer").clicked() {
+                                #[cfg(target_os = "windows")]
+                                {
+                                    let _ = std::process::Command::new("explorer")
+                                        .arg("/select,")
+                                        .arg(path.as_os_str())
+                                        .spawn();
+                                }
+                            }
+                            ui.label(path.display().to_string());
+                        });
+                    }
+                });
+        }
+    });
 }

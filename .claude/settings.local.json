@@ -5,7 +5,9 @@
       "Bash(rustc --version)",
       "Bash(cargo --version)",
       "WebFetch(domain:docs.rs)",
-      "Bash(cargo build:*)"
-    ]
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)"
+    ],
+    "defaultMode": "plan"
   }
 }

@@ -48,3 +48,17 @@ pub struct DuplicateGroup {
     pub paths: Vec<PathBuf>,
     pub wasted_space: u64,
 }
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum DuplicateStatus {
+    SameSize,
+    SamePartialHash,
+    Confirmed,
+}
+
+#[derive(Clone)]
+pub struct DuplicateCandidate {
+    pub file_size: u64,
+    pub paths: Vec<PathBuf>,
+    pub status: DuplicateStatus,
+}
