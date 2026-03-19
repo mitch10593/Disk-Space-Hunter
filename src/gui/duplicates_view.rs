@@ -17,7 +17,7 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
 
     let total_wasted: u64 = state.duplicates.iter().map(|g| g.wasted_space).sum();
     ui.heading(format!(
-        "{} duplicate groups — {} reclaimable",
+        "\u{26A0}\u{FE0F} {} duplicate groups — {} reclaimable",
         state.duplicates.len(),
         format_size(total_wasted)
     ));

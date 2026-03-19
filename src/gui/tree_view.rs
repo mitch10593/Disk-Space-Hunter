@@ -164,10 +164,12 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
                         if ui.small_button(icon).clicked() {
                             *toggled.borrow_mut() = Some(flat.index_path.clone());
                         }
+                        let folder_icon = if flat.is_expanded { "\u{1F4C2}" } else { "\u{1F4C1}" };
+                        ui.label(format!("{} {}", folder_icon, &flat.name));
                     } else {
                         ui.add_space(20.0);
+                        ui.label(format!("\u{1F4C4} {}", &flat.name));
                     }
-                    ui.label(&flat.name);
                 });
                 row.col(|ui| {
                     ui.label(format_size(flat.total_size));
@@ -191,12 +193,12 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
                     );
                 });
                 row.col(|ui| {
-                    if ui.small_button("Open").clicked() {
+                    if ui.small_button("\u{1F4C2} Open").clicked() {
                         let _ = std::process::Command::new("explorer")
                             .arg(&flat.path)
                             .spawn();
                     }
-                    if ui.small_button("Select").clicked() {
+                    if ui.small_button("\u{1F50D} Select").clicked() {
                         let _ = std::process::Command::new("explorer")
                             .arg("/select,")
                             .arg(&flat.path)
@@ -229,7 +231,7 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
 
 fn sort_label_text(name: &str, col: &SortColumn, current: SortColumn, ascending: bool) -> egui::RichText {
     let arrow = if *col == current {
-        if ascending { " \u{25B2}" } else { " \u{25BC}" }
+        if ascending { " \u{1F53C}" } else { " \u{1F53D}" }
     } else {
         ""
     };

@@ -11,7 +11,7 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
         ui.label("Path:");
         ui.add(egui::TextEdit::singleline(&mut state.scan_path).desired_width(400.0));
 
-        if ui.button("Browse").clicked() {
+        if ui.button("\u{1F4C1} Browse").clicked() {
             if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                 state.scan_path = folder.display().to_string();
             }
@@ -22,12 +22,12 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
             ScanStatus::ScanningTree | ScanStatus::DetectingDuplicates
         );
 
-        if ui.add_enabled(!is_scanning, egui::Button::new("Scan")).clicked() {
+        if ui.add_enabled(!is_scanning, egui::Button::new("\u{1F50D} Scan")).clicked() {
             start_scan(state, ctx);
         }
 
         if is_scanning {
-            if ui.button("Cancel").clicked() {
+            if ui.button("\u{274C} Cancel").clicked() {
                 state.cancel_scan();
             }
         }
