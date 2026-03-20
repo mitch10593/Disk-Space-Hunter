@@ -1,5 +1,15 @@
 use std::path::PathBuf;
 
+use super::file_category::FileCategory;
+
+#[derive(Clone, Default)]
+pub struct CategoryStats {
+    pub own_sizes: [u64; FileCategory::COUNT],
+    pub own_counts: [u32; FileCategory::COUNT],
+    pub total_sizes: [u64; FileCategory::COUNT],
+    pub total_counts: [u32; FileCategory::COUNT],
+}
+
 #[derive(Clone)]
 pub struct DirNode {
     pub name: String,
@@ -11,6 +21,7 @@ pub struct DirNode {
     pub children: Vec<DirNode>,
     pub expanded: bool,
     pub errors: Vec<String>,
+    pub category_stats: CategoryStats,
 }
 
 impl DirNode {
@@ -29,6 +40,7 @@ impl DirNode {
             children: Vec::new(),
             expanded: false,
             errors: Vec::new(),
+            category_stats: CategoryStats::default(),
         }
     }
 
@@ -40,6 +52,34 @@ impl DirNode {
         }
     }
 
+    pub fn filtered_total_size(&self, filter: &[bool; FileCategory::COUNT]) -> u64 {
+        self.category_stats
+            .total_sizes
+            .iter()
+            .zip(filter.iter())
+            .filter(|(_, &active)| active)
+            .map(|(&size, _)| size)
+            .sum()
+    }
+
+    pub fn filtered_total_file_count(&self, filter: &[bool; FileCategory::COUNT]) -> u32 {
+        self.category_stats
+            .total_counts
+            .iter()
+            .zip(filter.iter())
+            .filter(|(_, &active)| active)
+            .map(|(&count, _)| count)
+            .sum()
+    }
+
+    pub fn filtered_avg_file_size(&self, filter: &[bool; FileCategory::COUNT]) -> u64 {
+        let count = self.filtered_total_file_count(filter);
+        if count == 0 {
+            0
+        } else {
+            self.filtered_total_size(filter) / count as u64
+        }
+    }
 }
 
 #[derive(Clone)]

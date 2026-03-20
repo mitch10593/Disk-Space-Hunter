@@ -1,9 +1,9 @@
 #![windows_subsystem = "windows"]
 
 mod app;
-mod state;
-mod scanner;
 mod gui;
+mod scanner;
+mod state;
 
 use eframe::egui;
 

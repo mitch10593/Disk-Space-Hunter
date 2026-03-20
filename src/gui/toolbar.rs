@@ -4,6 +4,7 @@ use std::sync::Arc;
 use eframe::egui;
 
 use crate::scanner;
+use crate::scanner::file_category::FileCategory;
 use crate::state::{AppState, ScanStatus};
 
 pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
@@ -22,7 +23,10 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
             ScanStatus::ScanningTree | ScanStatus::DetectingDuplicates
         );
 
-        if ui.add_enabled(!is_scanning, egui::Button::new("\u{1F50D} Scan")).clicked() {
+        if ui
+            .add_enabled(!is_scanning, egui::Button::new("\u{1F50D} Scan"))
+            .clicked()
+        {
             start_scan(state, ctx);
         }
 
@@ -47,6 +51,22 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
         }
     });
 
+    if state.root_node.is_some() {
+        ui.horizontal(|ui| {
+            ui.label("Filter:");
+            for &cat in &FileCategory::ALL {
+                let selected = state.category_filter[cat.index()];
+                let label = format!("{} {}", cat.emoji(), cat.label());
+                if ui.selectable_label(selected, label).clicked() {
+                    state.toggle_category(cat);
+                }
+            }
+            if state.any_filter_active && ui.small_button("Clear").clicked() {
+                state.clear_filters();
+            }
+        });
+    }
+
     // Progress display
     match &state.scan_status {
         ScanStatus::ScanningTree => {
@@ -58,11 +78,7 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
                 ));
             });
             if !state.current_scan_path.is_empty() {
-                ui.label(
-                    egui::RichText::new(&state.current_scan_path)
-                        .small()
-                        .weak(),
-                );
+                ui.label(egui::RichText::new(&state.current_scan_path).small().weak());
             }
         }
         ScanStatus::DetectingDuplicates => {
@@ -77,10 +93,8 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
                         let elapsed = start.elapsed().as_secs_f64();
                         if elapsed > 0.5 && state.dup_bytes_read > 0 {
                             let speed = state.dup_bytes_read as f64 / elapsed;
-                            let speed_str = format!(
-                                "{}/s",
-                                crate::gui::formatting::format_size(speed as u64)
-                            );
+                            let speed_str =
+                                format!("{}/s", crate::gui::formatting::format_size(speed as u64));
                             let remaining_bytes =
                                 state.dup_bytes_total.saturating_sub(state.dup_bytes_read);
                             let eta_secs = (remaining_bytes as f64 / speed) as u64;
