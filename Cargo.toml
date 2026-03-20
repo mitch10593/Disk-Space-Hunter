@@ -8,7 +8,7 @@ eframe = "0.33"
 egui_extras = { version = "0.33", features = ["default"] }
 rfd = "0.15"
 jwalk = "0.8"
-blake3 = { version = "1", features = ["pure"] }
+blake3 = { version = "1", features = ["prefer_intrinsics"] }
 crossbeam-channel = "0.5"
 anyhow = "1"
 
