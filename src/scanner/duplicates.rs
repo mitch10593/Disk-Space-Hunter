@@ -269,7 +269,7 @@ fn full_hash_with_progress(
 ) -> std::io::Result<[u8; 32]> {
     let mut file = File::open(path)?;
     let mut hasher = blake3::Hasher::new();
-    let mut buf = [0u8; 8192];
+    let mut buf = [0u8; 512 * 1024];
     loop {
         let n = file.read(&mut buf)?;
         if n == 0 {
