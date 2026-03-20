@@ -158,6 +158,7 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
     let table = TableBuilder::new(ui)
         .striped(true)
         .resizable(true)
+        .sense(egui::Sense::click())
         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
         .column(Column::initial(350.0).at_least(150.0)) // Name
         .column(Column::initial(100.0).at_least(60.0)) // Size
