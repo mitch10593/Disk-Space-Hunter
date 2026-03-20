@@ -44,10 +44,18 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
         .column(Column::initial(100.0).at_least(60.0)) // Wasted
         .column(Column::remainder().at_least(200.0)) // Paths
         .header(22.0, |mut header| {
-            header.col(|ui| { ui.strong("File Size"); });
-            header.col(|ui| { ui.strong("Count"); });
-            header.col(|ui| { ui.strong("Wasted"); });
-            header.col(|ui| { ui.strong("Paths"); });
+            header.col(|ui| {
+                ui.strong("File Size");
+            });
+            header.col(|ui| {
+                ui.strong("Count");
+            });
+            header.col(|ui| {
+                ui.strong("Wasted");
+            });
+            header.col(|ui| {
+                ui.strong("Paths");
+            });
         })
         .body(|body| {
             body.rows(20.0, total_groups, |mut row| {
@@ -78,16 +86,24 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
 }
 
 fn render_candidates(ui: &mut egui::Ui, state: &AppState) {
-    let confirmed = state.dup_candidates.iter().filter(|c| c.status == DuplicateStatus::Confirmed).count();
+    let confirmed = state
+        .dup_candidates
+        .iter()
+        .filter(|c| c.status == DuplicateStatus::Confirmed)
+        .count();
     let pending = state.dup_candidates.len() - confirmed;
 
-    let total_wasted_est: u64 = state.dup_candidates.iter()
+    let total_wasted_est: u64 = state
+        .dup_candidates
+        .iter()
         .map(|c| c.file_size * (c.paths.len() as u64 - 1))
         .sum();
 
     ui.heading(format!(
         "\u{1F50D} Analysing duplicates — \u{2705} {} confirmed, \u{1F50E} {} pending — ~{} wasted",
-        confirmed, pending, format_size(total_wasted_est)
+        confirmed,
+        pending,
+        format_size(total_wasted_est)
     ));
     ui.separator();
 
@@ -108,11 +124,21 @@ fn render_candidates(ui: &mut egui::Ui, state: &AppState) {
             );
 
             egui::CollapsingHeader::new(header_text)
-                .id_salt(candidate.paths.first().map(|p| p.display().to_string()).unwrap_or_default())
+                .id_salt(
+                    candidate
+                        .paths
+                        .first()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default(),
+                )
                 .show(ui, |ui| {
                     for path in &candidate.paths {
                         ui.horizontal(|ui| {
-                            if ui.small_button("\u{1F4C2}").on_hover_text("Show in Explorer").clicked() {
+                            if ui
+                                .small_button("\u{1F4C2}")
+                                .on_hover_text("Show in Explorer")
+                                .clicked()
+                            {
                                 #[cfg(target_os = "windows")]
                                 {
                                     let _ = std::process::Command::new("explorer")

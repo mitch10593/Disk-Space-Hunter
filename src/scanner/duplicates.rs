@@ -64,7 +64,9 @@ pub fn detect(
             status: DuplicateStatus::SameSize,
         })
         .collect();
-    dup_candidates.sort_by(|a, b| (b.file_size * b.paths.len() as u64).cmp(&(a.file_size * a.paths.len() as u64)));
+    dup_candidates.sort_by(|a, b| {
+        (b.file_size * b.paths.len() as u64).cmp(&(a.file_size * a.paths.len() as u64))
+    });
     let _ = tx.send(ScanMessage::DuplicateCandidates(dup_candidates));
     repaint();
 
@@ -132,7 +134,9 @@ pub fn detect(
             status: DuplicateStatus::SamePartialHash,
         })
         .collect();
-    dup_candidates.sort_by(|a, b| (b.file_size * b.paths.len() as u64).cmp(&(a.file_size * a.paths.len() as u64)));
+    dup_candidates.sort_by(|a, b| {
+        (b.file_size * b.paths.len() as u64).cmp(&(a.file_size * a.paths.len() as u64))
+    });
     let _ = tx.send(ScanMessage::DuplicateCandidates(dup_candidates));
     repaint();
 
@@ -192,7 +196,9 @@ pub fn detect(
                 status: DuplicateStatus::SamePartialHash,
             });
         }
-        candidates.sort_by(|a, b| (b.file_size * b.paths.len() as u64).cmp(&(a.file_size * a.paths.len() as u64)));
+        candidates.sort_by(|a, b| {
+            (b.file_size * b.paths.len() as u64).cmp(&(a.file_size * a.paths.len() as u64))
+        });
         let _ = tx.send(ScanMessage::DuplicateCandidates(candidates));
         repaint();
     };
@@ -202,7 +208,13 @@ pub fn detect(
             return;
         }
         for path in paths {
-            if let Ok(hash) = full_hash_with_progress(path, &mut bytes_read, &mut last_update, checked, &mut send_progress) {
+            if let Ok(hash) = full_hash_with_progress(
+                path,
+                &mut bytes_read,
+                &mut last_update,
+                checked,
+                &mut send_progress,
+            ) {
                 full_groups
                     .entry((*size, hash))
                     .or_default()

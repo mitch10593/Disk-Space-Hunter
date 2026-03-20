@@ -2,23 +2,12 @@ use std::path::PathBuf;
 
 use super::file_category::FileCategory;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct CategoryStats {
     pub own_sizes: [u64; FileCategory::COUNT],
     pub own_counts: [u32; FileCategory::COUNT],
     pub total_sizes: [u64; FileCategory::COUNT],
     pub total_counts: [u32; FileCategory::COUNT],
-}
-
-impl Default for CategoryStats {
-    fn default() -> Self {
-        Self {
-            own_sizes: [0; FileCategory::COUNT],
-            own_counts: [0; FileCategory::COUNT],
-            total_sizes: [0; FileCategory::COUNT],
-            total_counts: [0; FileCategory::COUNT],
-        }
-    }
 }
 
 #[derive(Clone)]

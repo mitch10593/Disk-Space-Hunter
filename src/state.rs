@@ -114,6 +114,14 @@ impl AppState {
         self.any_filter_active = self.category_filter.iter().any(|&v| v);
     }
 
+    pub fn active_filter(&self) -> Option<[bool; FileCategory::COUNT]> {
+        if self.any_filter_active {
+            Some(self.category_filter)
+        } else {
+            None
+        }
+    }
+
     pub fn clear_filters(&mut self) {
         self.category_filter = [false; FileCategory::COUNT];
         self.any_filter_active = false;

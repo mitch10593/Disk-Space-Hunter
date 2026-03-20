@@ -64,7 +64,15 @@ impl FileCategory {
     }
 
     pub fn from_extension(ext: &str) -> FileCategory {
-        match ext.to_ascii_lowercase().as_str() {
+        let mut buf = [0u8; 16];
+        let len = ext.len().min(buf.len());
+        buf[..len].copy_from_slice(&ext.as_bytes()[..len]);
+        buf[..len].make_ascii_lowercase();
+        let lower = match std::str::from_utf8(&buf[..len]) {
+            Ok(s) => s,
+            Err(_) => return FileCategory::Other,
+        };
+        match lower {
             // Video
             "mp4" | "mkv" | "avi" | "mov" | "wmv" | "flv" | "webm" | "m4v" | "mpg" | "mpeg"
             | "vob" | "3gp" => FileCategory::Video,
@@ -89,8 +97,8 @@ impl FileCategory {
             | "sys" | "drv" => FileCategory::Executables,
 
             // Archives
-            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "zst" | "iso" | "cab"
-            | "dmg" | "lz4" | "lzma" => FileCategory::Archives,
+            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "zst" | "iso" | "cab" | "dmg"
+            | "lz4" | "lzma" => FileCategory::Archives,
 
             // Code
             "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" | "h" | "hpp"
