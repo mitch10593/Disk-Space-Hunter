@@ -5,6 +5,7 @@ use eframe::egui;
 use egui_extras::{Column, TableBuilder};
 
 use crate::gui::formatting::{format_count, format_size};
+use crate::scanner::file_category::FileCategory;
 use crate::scanner::tree::DirNode;
 use crate::state::{AppState, SortColumn};
 
@@ -21,37 +22,59 @@ struct FlatRow {
     parent_total_size: u64,
 }
 
-fn flatten_visible_tree(root: &DirNode) -> Vec<FlatRow> {
+fn flatten_visible_tree(root: &DirNode, filter: Option<&[bool; FileCategory::COUNT]>) -> Vec<FlatRow> {
     let mut rows = Vec::with_capacity(1024);
     fn recurse(
         node: &DirNode,
         depth: u16,
         path: &mut Vec<usize>,
         parent_total: u64,
+        filter: Option<&[bool; FileCategory::COUNT]>,
         rows: &mut Vec<FlatRow>,
     ) {
+        let (total_size, total_file_count, avg_file_size) = match filter {
+            Some(f) => (
+                node.filtered_total_size(f),
+                node.filtered_total_file_count(f),
+                node.filtered_avg_file_size(f),
+            ),
+            None => (node.total_size, node.total_file_count, node.avg_file_size()),
+        };
+        // Hide directories with zero matching files when a filter is active
+        if filter.is_some() && total_file_count == 0 {
+            return;
+        }
+        let has_visible_children = match filter {
+            Some(f) => node.children.iter().any(|c| c.filtered_total_file_count(f) > 0),
+            None => !node.children.is_empty(),
+        };
         rows.push(FlatRow {
             depth,
             index_path: path.clone(),
             is_expanded: node.expanded,
-            has_children: !node.children.is_empty(),
+            has_children: has_visible_children,
             name: node.name.clone(),
             path: node.path.clone(),
-            total_size: node.total_size,
-            total_file_count: node.total_file_count,
-            avg_file_size: node.avg_file_size(),
+            total_size,
+            total_file_count,
+            avg_file_size,
             parent_total_size: parent_total,
         });
         if node.expanded {
+            let node_total = total_size;
             for (i, child) in node.children.iter().enumerate() {
                 path.push(i);
-                recurse(child, depth + 1, path, node.total_size, rows);
+                recurse(child, depth + 1, path, node_total, filter, rows);
                 path.pop();
             }
         }
     }
+    let root_total = match filter {
+        Some(f) => root.filtered_total_size(f),
+        None => root.total_size,
+    };
     let mut path = Vec::new();
-    recurse(root, 0, &mut path, root.total_size, &mut rows);
+    recurse(root, 0, &mut path, root_total, filter, &mut rows);
     rows
 }
 
@@ -63,13 +86,16 @@ fn toggle_node_at(root: &mut DirNode, index_path: &[usize]) {
     node.expanded = !node.expanded;
 }
 
-fn sort_tree(node: &mut DirNode, column: &SortColumn, ascending: bool) {
+fn sort_tree(node: &mut DirNode, column: &SortColumn, ascending: bool, filter: Option<&[bool; FileCategory::COUNT]>) {
     node.children.sort_by(|a, b| {
-        let ord = match column {
-            SortColumn::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-            SortColumn::TotalSize => a.total_size.cmp(&b.total_size),
-            SortColumn::FileCount => a.total_file_count.cmp(&b.total_file_count),
-            SortColumn::AvgFileSize => a.avg_file_size().cmp(&b.avg_file_size()),
+        let ord = match (column, filter) {
+            (SortColumn::Name, _) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            (SortColumn::TotalSize, Some(f)) => a.filtered_total_size(f).cmp(&b.filtered_total_size(f)),
+            (SortColumn::TotalSize, None) => a.total_size.cmp(&b.total_size),
+            (SortColumn::FileCount, Some(f)) => a.filtered_total_file_count(f).cmp(&b.filtered_total_file_count(f)),
+            (SortColumn::FileCount, None) => a.total_file_count.cmp(&b.total_file_count),
+            (SortColumn::AvgFileSize, Some(f)) => a.filtered_avg_file_size(f).cmp(&b.filtered_avg_file_size(f)),
+            (SortColumn::AvgFileSize, None) => a.avg_file_size().cmp(&b.avg_file_size()),
         };
         if ascending {
             ord
@@ -78,7 +104,7 @@ fn sort_tree(node: &mut DirNode, column: &SortColumn, ascending: bool) {
         }
     });
     for child in &mut node.children {
-        sort_tree(child, column, ascending);
+        sort_tree(child, column, ascending, filter);
     }
 }
 
@@ -90,7 +116,12 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
         return;
     }
 
-    let flat_rows = flatten_visible_tree(state.root_node.as_ref().unwrap());
+    let filter = if state.any_filter_active {
+        Some(&state.category_filter)
+    } else {
+        None
+    };
+    let flat_rows = flatten_visible_tree(state.root_node.as_ref().unwrap(), filter);
     let total_rows = flat_rows.len();
 
     // Collect actions to apply after rendering
@@ -224,7 +255,12 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState) {
             state.sort_ascending = false;
         }
         if let Some(root) = &mut state.root_node {
-            sort_tree(root, &state.sort_column, state.sort_ascending);
+            let filter = if state.any_filter_active {
+                Some(&state.category_filter)
+            } else {
+                None
+            };
+            sort_tree(root, &state.sort_column, state.sort_ascending, filter);
         }
     }
 }

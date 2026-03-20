@@ -4,6 +4,7 @@ use std::sync::Arc;
 use eframe::egui;
 
 use crate::scanner;
+use crate::scanner::file_category::FileCategory;
 use crate::state::{AppState, ScanStatus};
 
 pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
@@ -46,6 +47,24 @@ pub fn render(ui: &mut egui::Ui, state: &mut AppState, ctx: &egui::Context) {
             }
         }
     });
+
+    if state.root_node.is_some() {
+        ui.horizontal(|ui| {
+            ui.label("Filter:");
+            for &cat in &FileCategory::ALL {
+                let selected = state.category_filter[cat.index()];
+                let label = format!("{} {}", cat.emoji(), cat.label());
+                if ui.selectable_label(selected, label).clicked() {
+                    state.toggle_category(cat);
+                }
+            }
+            if state.any_filter_active
+                && ui.small_button("Clear").clicked()
+            {
+                state.clear_filters();
+            }
+        });
+    }
 
     // Progress display
     match &state.scan_status {

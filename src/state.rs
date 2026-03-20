@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use crossbeam_channel::Receiver;
 
+use crate::scanner::file_category::FileCategory;
 use crate::scanner::tree::{DirNode, DuplicateCandidate, DuplicateGroup};
 
 pub enum ScanMessage {
@@ -72,6 +73,8 @@ pub struct AppState {
     pub detect_duplicates: bool,
     pub min_dup_size: u64,
     pub cancel_flag: Arc<AtomicBool>,
+    pub category_filter: [bool; FileCategory::COUNT],
+    pub any_filter_active: bool,
 }
 
 impl Default for AppState {
@@ -98,11 +101,24 @@ impl Default for AppState {
             detect_duplicates: false,
             min_dup_size: 1024 * 1024, // 1 MB
             cancel_flag: Arc::new(AtomicBool::new(false)),
+            category_filter: [false; FileCategory::COUNT],
+            any_filter_active: false,
         }
     }
 }
 
 impl AppState {
+    pub fn toggle_category(&mut self, cat: FileCategory) {
+        let idx = cat.index();
+        self.category_filter[idx] = !self.category_filter[idx];
+        self.any_filter_active = self.category_filter.iter().any(|&v| v);
+    }
+
+    pub fn clear_filters(&mut self) {
+        self.category_filter = [false; FileCategory::COUNT];
+        self.any_filter_active = false;
+    }
+
     pub fn cancel_scan(&mut self) {
         self.cancel_flag.store(true, Ordering::Relaxed);
         self.scan_status = ScanStatus::Cancelled;

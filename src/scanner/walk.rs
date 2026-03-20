@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crossbeam_channel::Sender;
 
+use crate::scanner::file_category::FileCategory;
 use crate::scanner::tree::DirNode;
 use crate::state::ScanMessage;
 
@@ -43,12 +44,21 @@ pub fn scan_directory(path: &str, tx: &Sender<ScanMessage>, repaint: &dyn Fn(), 
                     files_scanned += 1;
                     let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
 
+                    let category = entry_path
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(FileCategory::from_extension)
+                        .unwrap_or(FileCategory::Other);
+                    let cat_idx = category.index();
+
                     if let Some(parent_path) = entry_path.parent() {
                         let parent_node = dirs
                             .entry(parent_path.to_path_buf())
                             .or_insert_with(|| DirNode::new(parent_path.to_path_buf()));
                         parent_node.own_size += size;
                         parent_node.file_count += 1;
+                        parent_node.category_stats.own_sizes[cat_idx] += size;
+                        parent_node.category_stats.own_counts[cat_idx] += 1;
                     }
                 }
 
@@ -94,6 +104,12 @@ pub fn scan_directory(path: &str, tx: &Sender<ScanMessage>, repaint: &dyn Fn(), 
                     + child.children.iter().map(|c| c.total_file_count).sum::<u32>();
                 child.total_size = child.own_size
                     + child.children.iter().map(|c| c.total_size).sum::<u64>();
+                for i in 0..FileCategory::COUNT {
+                    child.category_stats.total_sizes[i] = child.category_stats.own_sizes[i]
+                        + child.children.iter().map(|c| c.category_stats.total_sizes[i]).sum::<u64>();
+                    child.category_stats.total_counts[i] = child.category_stats.own_counts[i]
+                        + child.children.iter().map(|c| c.category_stats.total_counts[i]).sum::<u32>();
+                }
                 child.children.sort_by(|a, b| b.total_size.cmp(&a.total_size));
 
                 if let Some(parent) = dirs.get_mut(&parent_path.to_path_buf()) {
@@ -109,6 +125,12 @@ pub fn scan_directory(path: &str, tx: &Sender<ScanMessage>, repaint: &dyn Fn(), 
             + root.children.iter().map(|c| c.total_file_count).sum::<u32>();
         root.total_size = root.own_size
             + root.children.iter().map(|c| c.total_size).sum::<u64>();
+        for i in 0..FileCategory::COUNT {
+            root.category_stats.total_sizes[i] = root.category_stats.own_sizes[i]
+                + root.children.iter().map(|c| c.category_stats.total_sizes[i]).sum::<u64>();
+            root.category_stats.total_counts[i] = root.category_stats.own_counts[i]
+                + root.children.iter().map(|c| c.category_stats.total_counts[i]).sum::<u32>();
+        }
         root.children.sort_by(|a, b| b.total_size.cmp(&a.total_size));
 
         let _ = tx.send(ScanMessage::TreeComplete(Box::new(root)));
