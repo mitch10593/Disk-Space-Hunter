@@ -283,3 +283,98 @@ fn full_hash_with_progress(
     }
     Ok(*hasher.finalize().as_bytes())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    #[test]
+    fn given_two_identical_files_when_detect_then_finds_duplicate_group() {
+        // GIVEN
+        let dir = tempfile::tempdir().unwrap();
+        let content = vec![0u8; 1024 * 1024]; // 1 MB
+        std::fs::write(dir.path().join("a.bin"), &content).unwrap();
+        std::fs::write(dir.path().join("b.bin"), &content).unwrap();
+
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let repaint = || {};
+
+        // WHEN
+        detect(dir.path().to_str().unwrap(), 1024, &tx, &repaint, &cancel);
+
+        // THEN — find DuplicatesComplete with one group of 2 paths
+        let groups = std::iter::from_fn(|| rx.try_recv().ok())
+            .filter_map(|msg| {
+                if let ScanMessage::DuplicatesComplete(g) = msg {
+                    Some(g)
+                } else {
+                    None
+                }
+            })
+            .next()
+            .expect("should receive DuplicatesComplete");
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].paths.len(), 2);
+        assert_eq!(groups[0].wasted_space, 1024 * 1024);
+    }
+
+    #[test]
+    fn given_two_different_files_when_detect_then_no_duplicates() {
+        // GIVEN — same size but different content
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.bin"), vec![0u8; 2048]).unwrap();
+        std::fs::write(dir.path().join("b.bin"), vec![1u8; 2048]).unwrap();
+
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let repaint = || {};
+
+        // WHEN
+        detect(dir.path().to_str().unwrap(), 1024, &tx, &repaint, &cancel);
+
+        // THEN
+        let groups = std::iter::from_fn(|| rx.try_recv().ok())
+            .filter_map(|msg| {
+                if let ScanMessage::DuplicatesComplete(g) = msg {
+                    Some(g)
+                } else {
+                    None
+                }
+            })
+            .next()
+            .expect("should receive DuplicatesComplete");
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn given_file_below_min_size_when_detect_then_skipped() {
+        // GIVEN — files are 512 bytes, min_size is 1024
+        let dir = tempfile::tempdir().unwrap();
+        let content = vec![0u8; 512];
+        std::fs::write(dir.path().join("a.bin"), &content).unwrap();
+        std::fs::write(dir.path().join("b.bin"), &content).unwrap();
+
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let repaint = || {};
+
+        // WHEN
+        detect(dir.path().to_str().unwrap(), 1024, &tx, &repaint, &cancel);
+
+        // THEN
+        let groups = std::iter::from_fn(|| rx.try_recv().ok())
+            .filter_map(|msg| {
+                if let ScanMessage::DuplicatesComplete(g) = msg {
+                    Some(g)
+                } else {
+                    None
+                }
+            })
+            .next()
+            .expect("should receive DuplicatesComplete");
+        assert!(groups.is_empty());
+    }
+}

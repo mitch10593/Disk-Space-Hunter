@@ -27,7 +27,7 @@ pub enum ScanMessage {
     Error(String),
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ScanStatus {
     Idle,
     ScanningTree,
@@ -192,5 +192,170 @@ impl AppState {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::Ordering;
+
+    // ── default ──────────────────────────────────────────────
+
+    #[test]
+    fn given_nothing_when_default_then_initial_state_is_correct() {
+        // GIVEN / WHEN
+        let state = AppState::default();
+        // THEN
+        assert_eq!(state.scan_status, ScanStatus::Idle);
+        assert_eq!(state.min_dup_size, 1024 * 1024);
+        assert!(!state.any_filter_active);
+        assert!(!state.detect_duplicates);
+        assert!(state.category_filter.iter().all(|&v| !v));
+    }
+
+    // ── toggle_category ──────────────────────────────────────
+
+    #[test]
+    fn given_no_filters_when_toggle_category_then_that_category_is_active() {
+        // GIVEN
+        let mut state = AppState::default();
+        // WHEN
+        state.toggle_category(FileCategory::Video);
+        // THEN
+        assert!(state.category_filter[FileCategory::Video.index()]);
+        assert!(state.any_filter_active);
+    }
+
+    #[test]
+    fn given_active_filter_when_toggle_same_category_then_deactivates() {
+        // GIVEN
+        let mut state = AppState::default();
+        state.toggle_category(FileCategory::Video);
+        // WHEN
+        state.toggle_category(FileCategory::Video);
+        // THEN
+        assert!(!state.category_filter[FileCategory::Video.index()]);
+        assert!(!state.any_filter_active);
+    }
+
+    #[test]
+    fn given_two_active_filters_when_toggle_one_off_then_other_remains() {
+        // GIVEN
+        let mut state = AppState::default();
+        state.toggle_category(FileCategory::Video);
+        state.toggle_category(FileCategory::Music);
+        // WHEN
+        state.toggle_category(FileCategory::Video);
+        // THEN
+        assert!(!state.category_filter[FileCategory::Video.index()]);
+        assert!(state.category_filter[FileCategory::Music.index()]);
+        assert!(state.any_filter_active);
+    }
+
+    // ── active_filter ────────────────────────────────────────
+
+    #[test]
+    fn given_no_filters_active_when_active_filter_then_returns_none() {
+        // GIVEN
+        let state = AppState::default();
+        // WHEN
+        let result = state.active_filter();
+        // THEN
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn given_filter_active_when_active_filter_then_returns_some_with_array() {
+        // GIVEN
+        let mut state = AppState::default();
+        state.toggle_category(FileCategory::Video);
+        // WHEN
+        let result = state.active_filter();
+        // THEN
+        let filter = result.expect("should be Some");
+        assert!(filter[FileCategory::Video.index()]);
+    }
+
+    // ── clear_filters ────────────────────────────────────────
+
+    #[test]
+    fn given_active_filters_when_clear_filters_then_all_false() {
+        // GIVEN
+        let mut state = AppState::default();
+        state.toggle_category(FileCategory::Video);
+        state.toggle_category(FileCategory::Music);
+        // WHEN
+        state.clear_filters();
+        // THEN
+        assert!(state.category_filter.iter().all(|&v| !v));
+        assert!(!state.any_filter_active);
+    }
+
+    // ── cancel_scan ──────────────────────────────────────────
+
+    #[test]
+    fn given_scanning_state_when_cancel_scan_then_flag_set_and_status_cancelled() {
+        // GIVEN
+        let mut state = AppState::default();
+        state.scan_status = ScanStatus::ScanningTree;
+        // WHEN
+        state.cancel_scan();
+        // THEN
+        assert!(state.cancel_flag.load(Ordering::Relaxed));
+        assert_eq!(state.scan_status, ScanStatus::Cancelled);
+        assert!(state.scan_rx.is_none());
+    }
+
+    // ── process_scan_messages ────────────────────────────────
+
+    #[test]
+    fn given_no_receiver_when_process_scan_messages_then_noop() {
+        // GIVEN
+        let mut state = AppState::default();
+        // WHEN — no panic expected
+        state.process_scan_messages();
+        // THEN
+        assert_eq!(state.scan_status, ScanStatus::Idle);
+    }
+
+    #[test]
+    fn given_progress_message_when_process_then_updates_counts() {
+        // GIVEN
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let mut state = AppState::default();
+        state.scan_rx = Some(rx);
+        tx.send(ScanMessage::Progress {
+            dirs_scanned: 10,
+            files_scanned: 50,
+            current_path: "/foo/bar".to_string(),
+        })
+        .unwrap();
+        // WHEN
+        state.process_scan_messages();
+        // THEN
+        assert_eq!(state.dirs_scanned, 10);
+        assert_eq!(state.files_scanned, 50);
+        assert_eq!(state.current_scan_path, "/foo/bar");
+    }
+
+    #[test]
+    fn given_tree_complete_message_when_process_then_root_expanded_and_status_complete() {
+        // GIVEN
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let mut state = AppState::default();
+        state.scan_status = ScanStatus::ScanningTree;
+        state.scan_rx = Some(rx);
+        state.detect_duplicates = false;
+
+        let node = DirNode::new(std::path::PathBuf::from("/root"));
+        tx.send(ScanMessage::TreeComplete(Box::new(node))).unwrap();
+        // WHEN
+        state.process_scan_messages();
+        // THEN
+        let root = state.root_node.as_ref().expect("root should be set");
+        assert!(root.expanded);
+        assert_eq!(state.scan_status, ScanStatus::Complete);
+        assert!(state.scan_rx.is_none());
     }
 }
