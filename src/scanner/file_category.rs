@@ -110,3 +110,143 @@ impl FileCategory {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── from_extension: one representative per category ──────
+
+    #[test]
+    fn given_mp4_when_from_extension_then_returns_video() {
+        // GIVEN
+        let ext = "mp4";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Video);
+    }
+
+    #[test]
+    fn given_mp3_when_from_extension_then_returns_music() {
+        // GIVEN
+        let ext = "mp3";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Music);
+    }
+
+    #[test]
+    fn given_jpg_when_from_extension_then_returns_images() {
+        // GIVEN
+        let ext = "jpg";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Images);
+    }
+
+    #[test]
+    fn given_pdf_when_from_extension_then_returns_documents() {
+        // GIVEN
+        let ext = "pdf";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Documents);
+    }
+
+    #[test]
+    fn given_exe_when_from_extension_then_returns_executables() {
+        // GIVEN
+        let ext = "exe";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Executables);
+    }
+
+    #[test]
+    fn given_zip_when_from_extension_then_returns_archives() {
+        // GIVEN
+        let ext = "zip";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Archives);
+    }
+
+    #[test]
+    fn given_rs_when_from_extension_then_returns_code() {
+        // GIVEN
+        let ext = "rs";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Code);
+    }
+
+    #[test]
+    fn given_unknown_ext_when_from_extension_then_returns_other() {
+        // GIVEN
+        let ext = "xyz";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Other);
+    }
+
+    // ── case handling and edge cases ─────────────────────────
+
+    #[test]
+    fn given_uppercase_ext_when_from_extension_then_matches_lowercase() {
+        // GIVEN
+        let ext = "MP4";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Video);
+    }
+
+    #[test]
+    fn given_mixed_case_ext_when_from_extension_then_matches() {
+        // GIVEN
+        let ext = "Mp3";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Music);
+    }
+
+    #[test]
+    fn given_extension_longer_than_16_bytes_when_from_extension_then_returns_other() {
+        // GIVEN — extension is truncated to 16 bytes, so it won't match any known extension
+        let ext = "abcdefghijklmnopqrstuvwxyz";
+        // WHEN
+        let cat = FileCategory::from_extension(ext);
+        // THEN
+        assert_eq!(cat, FileCategory::Other);
+    }
+
+    // ── enum metadata ────────────────────────────────────────
+
+    #[test]
+    fn given_all_categories_when_index_then_covers_zero_through_seven() {
+        // GIVEN
+        let all = FileCategory::ALL;
+        // WHEN
+        let indices: Vec<usize> = all.iter().map(|c| c.index()).collect();
+        // THEN
+        assert_eq!(all.len(), FileCategory::COUNT);
+        assert_eq!(indices, vec![0, 1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn given_all_categories_when_label_then_returns_nonempty_strings() {
+        // GIVEN / WHEN / THEN
+        for cat in FileCategory::ALL {
+            assert!(!cat.label().is_empty(), "{:?} has empty label", cat);
+        }
+    }
+}

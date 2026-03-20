@@ -178,3 +178,95 @@ fn truncate_path(path: &Path, max_len: usize) -> String {
         format!("...{}", &s[s.len() - max_len + 3..])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    // ── truncate_path ────────────────────────────────────────
+
+    #[test]
+    fn given_short_path_when_truncate_then_returns_unchanged() {
+        // GIVEN
+        let path = Path::new("C:/Users/test");
+        // WHEN
+        let result = truncate_path(path, 60);
+        // THEN
+        assert_eq!(result, "C:/Users/test");
+    }
+
+    #[test]
+    fn given_long_path_when_truncate_then_adds_ellipsis_prefix() {
+        // GIVEN
+        let path = Path::new("C:/very/long/path/that/exceeds/the/limit");
+        let max_len = 20;
+        // WHEN
+        let result = truncate_path(path, max_len);
+        // THEN
+        assert!(result.starts_with("..."));
+        assert_eq!(result.len(), max_len);
+    }
+
+    #[test]
+    fn given_unc_prefix_when_truncate_then_strips_prefix() {
+        // GIVEN
+        let path = Path::new(r"\\?\C:\Users\test");
+        // WHEN
+        let result = truncate_path(path, 60);
+        // THEN
+        assert!(!result.contains(r"\\?\"));
+        assert!(result.contains("C:"));
+    }
+
+    // ── scan_directory ───────────────────────────────────────
+
+    #[test]
+    fn given_temp_dir_with_files_when_scan_then_tree_has_correct_totals() {
+        // GIVEN
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("subdir");
+        std::fs::create_dir(&sub).unwrap();
+        std::fs::write(dir.path().join("root.txt"), vec![0u8; 100]).unwrap();
+        std::fs::write(sub.join("child.txt"), vec![0u8; 200]).unwrap();
+
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let repaint = || {};
+
+        // WHEN
+        scan_directory(dir.path().to_str().unwrap(), &tx, &repaint, &cancel);
+
+        // THEN — drain messages and find TreeComplete
+        let mut root = None;
+        while let Ok(msg) = rx.try_recv() {
+            if let ScanMessage::TreeComplete(node) = msg {
+                root = Some(*node);
+            }
+        }
+        let root = root.expect("should receive TreeComplete");
+        assert_eq!(root.total_size, 300);
+        assert_eq!(root.total_file_count, 2);
+        assert_eq!(root.file_count, 1); // root.txt only
+    }
+
+    #[test]
+    fn given_cancel_flag_set_when_scan_then_no_tree_complete_sent() {
+        // GIVEN
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("file.txt"), b"data").unwrap();
+
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let cancel = Arc::new(AtomicBool::new(true)); // pre-cancelled
+        let repaint = || {};
+
+        // WHEN
+        scan_directory(dir.path().to_str().unwrap(), &tx, &repaint, &cancel);
+
+        // THEN — no TreeComplete message
+        let has_tree_complete = std::iter::from_fn(|| rx.try_recv().ok())
+            .any(|msg| matches!(msg, ScanMessage::TreeComplete(_)));
+        assert!(!has_tree_complete);
+    }
+}
